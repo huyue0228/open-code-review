@@ -48,6 +48,7 @@ type Args struct {
 	FileFilter            *rules.FileFilter
 	LLMClient             llm.LLMClient
 	Tools                 *tool.Registry
+	PlanTools             string // Reference-only descriptions; planning never executes tools.
 	MainToolDefs          []llm.ToolDef
 	CommentCollector      *tool.CommentCollector
 	CommentWorkerPool     *llmloop.CommentWorkerPool
@@ -859,7 +860,16 @@ func (a *Agent) maybeRunPlan(ctx context.Context, it model.ScanItem, rule string
 		content = strings.ReplaceAll(content, "{{current_file_path}}", it.Path)
 		content = strings.ReplaceAll(content, "{{system_rule}}", rule)
 		content = strings.ReplaceAll(content, "{{file_content}}", it.Content)
+		content = strings.ReplaceAll(content, "{{requirement_background}}", a.args.Background)
+		content = strings.ReplaceAll(content, "{{plan_tools}}", a.args.PlanTools)
 		messages = append(messages, llm.NewTextMessage(m.Role, content))
+	}
+
+	if tokenCount := llmloop.CountMessagesTokens(messages); tokenCount > llmloop.PromptTokenLimit(a.args.Template.MaxTokens) {
+		msg := fmt.Sprintf("plan prompt tokens (%d) exceed 80%% of max_tokens(%d); continuing without a plan", tokenCount, a.args.Template.MaxTokens)
+		a.recordWarning("plan_token_threshold_exceeded", it.Path, msg)
+		fmt.Fprintf(stdout.Writer(), "[ocr] WARNING: %s for %s\n", msg, it.Path)
+		return noPlan
 	}
 
 	fs := a.session.GetOrCreateFileSession(it.Path)

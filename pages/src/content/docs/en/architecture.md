@@ -454,3 +454,9 @@ See [Contributing](../contributing/) for build & test instructions.
 - [Tools](../tools/) — the six tools the agent loop calls.
 - [Review Rules](../review-rules/) — how per-file rule text is resolved.
 - [Session Viewer](../viewer/) — inspect the transcripts this pipeline writes.
+
+## Scan context and planning
+
+Full-file scanning uses the same background-file resolver and MCP initialization as review. The effective background and reference-only tool descriptions enter the scan Plan prompt. Plan remains a single request without executable tools, returning the existing `summary/checkpoints` JSON; `why` may describe the tool, arguments, and purpose of a proposed lookup. Main receives that guidance and the background, and uses the shared tool loop for actual MCP calls.
+
+The rendered Plan prompt is checked against 80% of `max_tokens`. If it exceeds the limit, a `plan_token_threshold_exceeded` warning is recorded and the scan continues without planning. Main retains its existing prompt and tool budgets. Scan resume still fingerprints code rather than external context; a warning directs users to start a new scan when that context changes.

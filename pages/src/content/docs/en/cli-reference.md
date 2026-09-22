@@ -384,6 +384,18 @@ ocr scan --exclude '**/generated/*,*.pb.go'
 
 See `ocr scan -h` for the full flag list.
 
+### Background and external knowledge
+
+`--background/-b` supplies inline context; `--background-file/-B` reads a Markdown file relative to the repository root (absolute paths also work). The file takes precedence over inline text. It uses the same validation as `review`: empty or invalid content fails, the file limit is 1 MiB, and cleaned content warns above 2,000 characters and fails above 8,000. The effective background reaches both Plan and Main.
+
+```bash
+ocr scan --path src/orders --background-file ./docs/orders.md
+```
+
+Actual scans use the same configured `mcp_servers` as `review`, including local `setup` commands, remote authentication, and tool allowlists. Plan receives tool descriptions and suggests calls; only Main executes tools. `--no-plan` skips planning but keeps Main context and tools. `--preview` validates the background file without starting MCP, running setup, calling the model, or creating a session.
+
+`--resume` keeps the existing code-based reuse behavior. When background or MCP is configured, OCR warns that context versions are not checked. Start a new scan after requirements or knowledge change.
+
 ## `ocr session`
 
 Lists and inspects local review session logs saved under

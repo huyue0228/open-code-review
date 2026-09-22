@@ -8,6 +8,12 @@ OCR 可以作为 **Model Context Protocol（MCP）客户端**。你把它指向�
 MCP server，这些 server 暴露的工具就会提供给审查 agent —— 与 `file_read`、
 `code_search` 等[内置工具](../tools/)并列。
 
+## 全文件扫描中的 MCP
+
+`ocr review` 和 `ocr scan` 共用这里的配置。每次扫描只初始化各服务器一次，并在文件任务之间共享连接；配置的 `setup` 命令也会在扫描时执行。仅成功注册的工具进入规划说明和 Main 工具列表。白名单及名称冲突规则保持不变；scan 不提供 `file_read_diff`。
+
+Plan 只描述拟调用的工具，不实际执行。Main 按需查询知识，现有 Session 日志记录调用及结果。连接或 setup 失败时向 stderr 报警并跳过该服务，扫描继续；这不表示外部知识已完成校验。`--preview` 不连接 MCP。成功的报告文件在有界 MCP 关闭之前完成落盘。
+
 ## 何时使用
 
 当审查器需要 diff 之外的上下文时，就该引入 MCP server：

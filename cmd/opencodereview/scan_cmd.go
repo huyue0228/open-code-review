@@ -12,9 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alibaba/open-code-review/internal/agent"
 	"github.com/alibaba/open-code-review/internal/config/template"
 	"github.com/alibaba/open-code-review/internal/llm"
 	"github.com/alibaba/open-code-review/internal/llmloop"
+	"github.com/alibaba/open-code-review/internal/mcp"
 	"github.com/alibaba/open-code-review/internal/scan"
 	"github.com/alibaba/open-code-review/internal/session"
 	"github.com/alibaba/open-code-review/internal/telemetry"
@@ -34,6 +36,7 @@ type scanOptions struct {
 	audience              string
 	outputPath            string
 	background            string
+	backgroundFile        string
 	concurrency           int
 	concurrentTaskTimeout int
 	maxTools              int
@@ -66,6 +69,9 @@ var scanCmd = &cobra.Command{
 
   # Scan multiple files
   ocr scan --path internal/agent/agent.go,internal/diff/scan.go
+
+  # Supply requirement context (also uses configured MCP servers)
+  ocr scan --background-file ./docs/requirements.md
 
   # Select a configured provider and model for this run only
   ocr scan --provider openai --model gpt-5.4 --format json
@@ -113,9 +119,20 @@ func executeScan(opts scanOptions) (retErr error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
+	closeOutPending := true
+	finishOutput := func() error {
+		if !closeOutPending {
+			return nil
+		}
+		closeOutPending = false
 		if cerr := closeOut(); cerr != nil {
-			retErr = errors.Join(retErr, fmt.Errorf("close output file: %w", cerr))
+			return fmt.Errorf("close output file: %w", cerr)
+		}
+		return nil
+	}
+	defer func() {
+		if cerr := finishOutput(); cerr != nil {
+			retErr = errors.Join(retErr, cerr)
 		}
 	}()
 
@@ -124,6 +141,11 @@ func executeScan(opts scanOptions) (retErr error) {
 		return err
 	}
 	applyCLIExcludes(cc, splitPaths(opts.excludes))
+
+	opts.background, err = resolveBackground(cc.RepoDir, opts.background, opts.backgroundFile, "")
+	if err != nil {
+		return err
+	}
 
 	// scan owns its own template (scan_template.json) independent from the
 	// diff-review template loaded by loadCommonContext above. Apply --max-tools
@@ -188,10 +210,9 @@ func executeScan(opts scanOptions) (retErr error) {
 		scanTpl.ApplyLanguage(rt.AppCfg.Language)
 	}
 
-	// file_read_diff is meaningless in scan mode (no diff exists). Hiding it
-	// from MainToolDefs stops the LLM from burning tool-call rounds probing
-	// for diff content that does not exist.
-	scanToolDefs := excludeToolDef(rt.MainToolDefs, "file_read_diff")
+	if opts.resume != "" && (strings.TrimSpace(opts.background) != "" || (rt.AppCfg != nil && len(rt.AppCfg.MCPServers) > 0)) {
+		fmt.Fprintln(os.Stderr, "[ocr] WARNING: scan resume does not validate background or knowledge-base versions; start a new scan if that context has changed.")
+	}
 
 	// Scan mode always reads file contents from the working tree.
 	fileReader := &tool.FileReader{
@@ -201,6 +222,15 @@ func executeScan(opts scanOptions) (retErr error) {
 	}
 	tools := buildToolRegistry(rt.Collector, fileReader)
 
+	ctx, span := telemetry.StartSpan(telemetry.ContextWithTraceParentFromEnv(context.Background()), "scan.run")
+	defer span.End()
+	mcpClients := initMCPClients(ctx, rt.AppCfg, tools, cc.RepoDir, Version)
+	defer closeReviewMCPClients(mcpClients)
+	mcpToolDefs := mcp.CollectToolDefs(mcpClients, tools)
+	// A scan has no diff. Both planning advice and executable tools must omit it.
+	planToolDefs := excludeToolDef(append(rt.PlanToolDefs, mcpToolDefs...), "file_read_diff")
+	scanToolDefs := excludeToolDef(append(rt.MainToolDefs, mcpToolDefs...), "file_read_diff")
+
 	ag := scan.NewAgent(scan.Args{
 		RepoDir:               cc.RepoDir,
 		Paths:                 scanPaths,
@@ -209,6 +239,7 @@ func executeScan(opts scanOptions) (retErr error) {
 		FileFilter:            cc.FileFilter,
 		LLMClient:             rt.Client,
 		Tools:                 tools,
+		PlanTools:             agent.FormatToolDefs(planToolDefs),
 		MainToolDefs:          scanToolDefs,
 		CommentCollector:      rt.Collector,
 		CommentWorkerPool:     llmloop.NewCommentWorkerPool(opts.concurrency),
@@ -231,8 +262,6 @@ func executeScan(opts scanOptions) (retErr error) {
 	q := newQuietHandle(opts.outputFormat, opts.audience)
 	defer q.Restore()
 
-	ctx, span := telemetry.StartSpan(telemetry.ContextWithTraceParentFromEnv(context.Background()), "scan.run")
-	defer span.End()
 	var traceID string
 	if telemetry.IsEnabled() {
 		traceID = telemetry.TraceIDFromContext(ctx)
@@ -252,7 +281,11 @@ func executeScan(opts scanOptions) (retErr error) {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	return emitRunResult(ctx, ag, comments, startTime, opts.outputFormat, opts.audience, q, llmIdentity, out, nil)
+	if err := emitRunResult(ctx, ag, comments, startTime, opts.outputFormat, opts.audience, q, llmIdentity, out, nil); err != nil {
+		return err
+	}
+	// Publish the report before potentially slow MCP shutdown, as review does.
+	return finishOutput()
 }
 
 func loadScanResumeState(repoDir string, opts scanOptions, scanPaths []string) (*session.ResumeState, error) {

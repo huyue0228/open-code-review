@@ -374,3 +374,9 @@ Web UI（`ocr viewer`）直接读这些文件——没有数据库，只有 appe
 - [工具](../tools/)——agent 循环调用的六种工具。
 - [评审规则](../review-rules/)——按文件的规则文本如何解析。
 - [会话查看器](../viewer/)——检查此流水线写出的转录。
+
+## Scan 的上下文与规划
+
+全文件扫描复用 review 的背景文件解析和 MCP 初始化。有效背景与仅供参考的工具说明进入 scan Plan 提示词。Plan 仍是单次请求，不携带可执行工具，返回现有 `summary/checkpoints` JSON；`why` 可描述建议查询的工具、参数和目的。Main 接收计划和背景，并通过共享工具循环实际调用 MCP。
+
+渲染后的 Plan 提示词按 `max_tokens` 的 80% 检查；超限时记录 `plan_token_threshold_exceeded` 告警，跳过 Plan 后继续扫描。Main 保持原有提示词及工具预算。恢复扫描仍按代码而非外部上下文生成指纹，并提示上下文变化后应启动新扫描。

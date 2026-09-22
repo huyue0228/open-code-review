@@ -377,6 +377,18 @@ ocr scan --exclude '**/generated/*,*.pb.go'
 
 전체 플래그 목록은 `ocr scan -h`로 확인하세요.
 
+### 배경과 외부 지식
+
+`--background/-b`는 배경 텍스트를, `--background-file/-B`는 저장소 루트 기준 Markdown 파일을 지정합니다. 절대 경로도 지원하며 파일이 텍스트보다 우선합니다. 검증은 `review`와 같습니다. 비어 있거나 잘못된 내용은 오류이며 파일 한도는 1 MiB입니다. 정리된 내용이 2,000자를 넘으면 경고하고 8,000자를 넘으면 오류가 발생합니다. 유효한 배경은 Plan과 Main 모두에 전달됩니다.
+
+```bash
+ocr scan --path src/orders --background-file ./docs/orders.md
+```
+
+실제 스캔은 `review`와 같은 `mcp_servers` 설정을 사용하며 로컬 `setup`, 원격 인증, 도구 허용 목록도 적용합니다. Plan은 도구 설명을 보고 호출을 제안하며 Main만 실제 도구를 실행합니다. `--no-plan`도 Main의 배경과 도구를 유지합니다. `--preview`는 배경 파일을 검증하지만 MCP 시작, setup 실행, 모델 호출, Session 생성을 수행하지 않습니다.
+
+`--resume`은 기존 코드 기반 재사용을 유지합니다. 배경이나 MCP가 설정되면 컨텍스트 버전을 검증하지 않는다는 경고를 표시합니다. 요구사항이나 지식이 변경되면 새 스캔을 시작하세요.
+
 ## `ocr session` {#ocr-session}
 
 `~/.opencodereview/sessions/` 아래에 저장된 로컬 리뷰 세션 로그를 나열하고 살펴봅니다.

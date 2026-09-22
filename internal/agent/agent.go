@@ -2046,6 +2046,11 @@ func (a *Agent) extFromPath(path string) string {
 	return strings.ToLower(basename[dot:])
 }
 
+// FormatToolDefs exposes the review planner's reference-only tool description format.
+func FormatToolDefs(toolDefs []llm.ToolDef) string {
+	return formatToolDefs(toolDefs)
+}
+
 // formatToolDefs renders tool definitions as human-readable text for embedding in prompts.
 func formatToolDefs(toolDefs []llm.ToolDef) string {
 	if len(toolDefs) == 0 {

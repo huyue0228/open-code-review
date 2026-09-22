@@ -9,6 +9,12 @@ one or more external MCP servers, and the tools those servers expose
 become available to the review agent — right alongside the
 [built-in tools](../tools/) like `file_read` and `code_search`.
 
+## MCP in full-file scans
+
+Both `ocr review` and `ocr scan` use this configuration. A scan starts each configured server once and shares the connections across file tasks; configured `setup` commands also apply to scans. Only successfully registered tools enter the planning descriptions and Main tool list. Allowlist and name-conflict rules are unchanged; `file_read_diff` is unavailable in scan mode.
+
+Plan only describes intended calls and never executes them. Main can query knowledge on demand and the normal Session log records tool calls and results. Connection/setup failures warn on stderr and skip that server while scanning continues; this does not mean the external knowledge was checked. `--preview` makes no MCP connections. Successful report files are published before bounded MCP shutdown.
+
 ## When to use it
 
 Reach for an MCP server when the reviewer would benefit from context that

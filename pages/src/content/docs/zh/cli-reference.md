@@ -362,6 +362,18 @@ ocr scan --exclude '**/generated/*,*.pb.go'
 
 完整参数列表见 `ocr scan -h`。
 
+### 业务背景与外部知识
+
+`--background/-b` 传入背景文本；`--background-file/-B` 读取相对于仓库根目录的 Markdown 文件，也支持绝对路径。文件优先于内联文本。校验与 `review` 相同：空内容或非法内容报错，文件上限为 1 MiB，清洗后超过 2,000 字符提示，超过 8,000 字符报错。最终背景同时传入 Plan 和 Main。
+
+```bash
+ocr scan --path src/orders --background-file ./docs/orders.md
+```
+
+实际扫描使用与 `review` 相同的 `mcp_servers` 配置，包括本地 `setup`、远程认证和工具白名单。Plan 接收工具说明并建议调用，只有 Main 实际执行工具。`--no-plan` 跳过规划，但保留 Main 的背景和工具。`--preview` 校验背景文件，不启动 MCP、不执行 setup、不调用模型，也不创建 Session。
+
+`--resume` 保持现有基于代码的复用行为。提供背景或配置 MCP 时，OCR 会提示未检查上下文版本；需求或知识变化后应启动新的扫描。
+
 ## `ocr session`
 
 列出和查看保存在 `~/.opencodereview/sessions/` 下的本地评审会话日志。

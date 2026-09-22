@@ -360,6 +360,18 @@ ocr scan --exclude '**/generated/*,*.pb.go'
 
 完全なフラグリストは `ocr scan -h` を参照してください。
 
+### 背景と外部ナレッジ
+
+`--background/-b` は背景テキスト、`--background-file/-B` はリポジトリルートを基準とする Markdown ファイルを指定します。絶対パスも使用でき、ファイルがテキストより優先されます。検証は `review` と共通です。空または不正な内容はエラー、ファイル上限は 1 MiB、整形後の内容は 2,000 文字超で警告、8,000 文字超でエラーになります。有効な背景は Plan と Main の両方に渡されます。
+
+```bash
+ocr scan --path src/orders --background-file ./docs/orders.md
+```
+
+実際のスキャンは `review` と同じ `mcp_servers` 設定を使用し、ローカルの `setup`、リモート認証、ツール許可リストも適用します。Plan はツールの説明から呼び出しを提案し、実行するのは Main だけです。`--no-plan` でも Main の背景とツールは保持されます。`--preview` は背景ファイルを検証しますが、MCP、setup、モデル、Session 作成を実行しません。
+
+`--resume` は従来のコードに基づく再利用を維持します。背景または MCP が設定されている場合、コンテキストのバージョンを検証しない旨を警告します。要件やナレッジの変更後は新規スキャンを開始してください。
+
 ## `ocr session`
 
 `~/.opencodereview/sessions/` 配下に保存されたローカルレビューセッションログを一覧表示・確認します。
