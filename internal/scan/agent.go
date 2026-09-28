@@ -55,6 +55,7 @@ type Args struct {
 	MaxConcurrency        int
 	ConcurrentTaskTimeout int
 	Model                 string
+	EndpointSource        string
 	Background            string
 	GitRunner             *gitcmd.Runner
 	Session               *session.SessionHistory
@@ -129,6 +130,7 @@ func NewAgent(args Args) *Agent {
 			ReviewMode:  session.ReviewModeFullScan,
 			ScanPaths:   args.Paths,
 			ResumedFrom: resumedFromSession(args.Resume),
+			LLMSource:   args.EndpointSource,
 		})
 	}
 	a := &Agent{

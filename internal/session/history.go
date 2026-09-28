@@ -44,6 +44,7 @@ type SessionHistory struct {
 	RepoDir      string
 	GitBranch    string
 	Model        string
+	LLMSource    string
 	ReviewMode   string
 	DiffFrom     string
 	DiffTo       string
@@ -136,6 +137,7 @@ type SessionOptions struct {
 	DiffCommit  string
 	ScanPaths   []string
 	ResumedFrom string
+	LLMSource   string
 
 	// Operation opts this session into a run manifest. When non-empty (e.g.
 	// "review") New creates a ManifestBuilder with this operation and the session
@@ -160,6 +162,7 @@ func New(repoDir, gitBranch, model string, opts SessionOptions) *SessionHistory 
 		RepoDir:      repoDir,
 		GitBranch:    gitBranch,
 		Model:        model,
+		LLMSource:    opts.LLMSource,
 		ReviewMode:   opts.ReviewMode,
 		DiffFrom:     opts.DiffFrom,
 		DiffTo:       opts.DiffTo,
