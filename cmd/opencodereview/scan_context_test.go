@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -166,6 +167,24 @@ func runScanContext(t *testing.T, opts scanOptions) (string, string, error) {
 	var err error
 	diagnostic := captureStderr(t, func() { output = captureStdout(t, func() { err = executeScan(opts) }) })
 	return output, diagnostic, err
+}
+
+func TestScanContextCancellation(t *testing.T) {
+	f, opts := newScanContextFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var err error
+	captureStderr(t, func() {
+		captureStdout(t, func() { err = executeScanContext(ctx, opts) })
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.plans)+len(f.mains) != 0 || f.lookups.Load() != 0 {
+		t.Fatalf("cancelled scan performed work: plans=%d mains=%d lookups=%d", len(f.plans), len(f.mains), f.lookups.Load())
+	}
 }
 
 func TestScanBackgroundFlags(t *testing.T) {

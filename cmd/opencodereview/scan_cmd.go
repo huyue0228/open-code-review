@@ -91,7 +91,7 @@ var scanCmd = &cobra.Command{
 		if err := validateScanOptions(&scanOpts); err != nil {
 			return err
 		}
-		return executeScan(scanOpts)
+		return executeScanContext(cmd.Context(), scanOpts)
 	},
 }
 
@@ -114,7 +114,11 @@ func splitPaths(raw string) []string {
 	return out
 }
 
-func executeScan(opts scanOptions) (retErr error) {
+func executeScan(opts scanOptions) error {
+	return executeScanContext(context.Background(), opts)
+}
+
+func executeScanContext(ctx context.Context, opts scanOptions) (retErr error) {
 	out, closeOut, err := resolveOutputWriter(opts.outputPath, opts.outputFormat)
 	if err != nil {
 		return err
@@ -191,6 +195,7 @@ func executeScan(opts scanOptions) (retErr error) {
 	rt, err := loadLLMRuntime(cc.Template, opts.toolConfigPath, llm.ResolveOptions{
 		Provider: opts.provider,
 		Model:    opts.model,
+		Context:  ctx,
 	})
 	if err != nil {
 		return err
@@ -222,7 +227,7 @@ func executeScan(opts scanOptions) (retErr error) {
 	}
 	tools := buildToolRegistry(rt.Collector, fileReader)
 
-	ctx, span := telemetry.StartSpan(telemetry.ContextWithTraceParentFromEnv(context.Background()), "scan.run")
+	ctx, span := telemetry.StartSpan(telemetry.ContextWithTraceParentFromEnv(ctx), "scan.run")
 	defer span.End()
 	mcpClients := initMCPClients(ctx, rt.AppCfg, tools, cc.RepoDir, Version)
 	defer closeReviewMCPClients(mcpClients)
